@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as RfqsRfqIdRouteImport } from './routes/rfqs.$rfqId'
 
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
@@ -22,31 +23,40 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RfqsRfqIdRoute = RfqsRfqIdRouteImport.update({
+  id: '/rfqs/$rfqId',
+  path: '/rfqs/$rfqId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/upload': typeof UploadRoute
+  '/rfqs/$rfqId': typeof RfqsRfqIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/upload': typeof UploadRoute
+  '/rfqs/$rfqId': typeof RfqsRfqIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/upload': typeof UploadRoute
+  '/rfqs/$rfqId': typeof RfqsRfqIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/upload'
+  fullPaths: '/' | '/upload' | '/rfqs/$rfqId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/upload'
-  id: '__root__' | '/' | '/upload'
+  to: '/' | '/upload' | '/rfqs/$rfqId'
+  id: '__root__' | '/' | '/upload' | '/rfqs/$rfqId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   UploadRoute: typeof UploadRoute
+  RfqsRfqIdRoute: typeof RfqsRfqIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rfqs/$rfqId': {
+      id: '/rfqs/$rfqId'
+      path: '/rfqs/$rfqId'
+      fullPath: '/rfqs/$rfqId'
+      preLoaderRoute: typeof RfqsRfqIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   UploadRoute: UploadRoute,
+  RfqsRfqIdRoute: RfqsRfqIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
