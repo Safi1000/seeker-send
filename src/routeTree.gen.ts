@@ -14,6 +14,7 @@ import { Route as UploadRouteImport } from './routes/upload'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RfqsRfqIdRouteImport } from './routes/rfqs.$rfqId'
 import { Route as ItemsItemIdRouteImport } from './routes/items.$itemId'
+import { Route as EmailsItemIdRouteImport } from './routes/emails.$itemId'
 
 const VerificationRoute = VerificationRouteImport.update({
   id: '/verification',
@@ -40,11 +41,17 @@ const ItemsItemIdRoute = ItemsItemIdRouteImport.update({
   path: '/items/$itemId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EmailsItemIdRoute = EmailsItemIdRouteImport.update({
+  id: '/emails/$itemId',
+  path: '/emails/$itemId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/upload': typeof UploadRoute
   '/verification': typeof VerificationRoute
+  '/emails/$itemId': typeof EmailsItemIdRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/rfqs/$rfqId': typeof RfqsRfqIdRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/upload': typeof UploadRoute
   '/verification': typeof VerificationRoute
+  '/emails/$itemId': typeof EmailsItemIdRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/rfqs/$rfqId': typeof RfqsRfqIdRoute
 }
@@ -60,6 +68,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/upload': typeof UploadRoute
   '/verification': typeof VerificationRoute
+  '/emails/$itemId': typeof EmailsItemIdRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/rfqs/$rfqId': typeof RfqsRfqIdRoute
 }
@@ -69,15 +78,23 @@ export interface FileRouteTypes {
     | '/'
     | '/upload'
     | '/verification'
+    | '/emails/$itemId'
     | '/items/$itemId'
     | '/rfqs/$rfqId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/upload' | '/verification' | '/items/$itemId' | '/rfqs/$rfqId'
+  to:
+    | '/'
+    | '/upload'
+    | '/verification'
+    | '/emails/$itemId'
+    | '/items/$itemId'
+    | '/rfqs/$rfqId'
   id:
     | '__root__'
     | '/'
     | '/upload'
     | '/verification'
+    | '/emails/$itemId'
     | '/items/$itemId'
     | '/rfqs/$rfqId'
   fileRoutesById: FileRoutesById
@@ -86,6 +103,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   UploadRoute: typeof UploadRoute
   VerificationRoute: typeof VerificationRoute
+  EmailsItemIdRoute: typeof EmailsItemIdRoute
   ItemsItemIdRoute: typeof ItemsItemIdRoute
   RfqsRfqIdRoute: typeof RfqsRfqIdRoute
 }
@@ -127,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ItemsItemIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/emails/$itemId': {
+      id: '/emails/$itemId'
+      path: '/emails/$itemId'
+      fullPath: '/emails/$itemId'
+      preLoaderRoute: typeof EmailsItemIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -134,6 +159,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   UploadRoute: UploadRoute,
   VerificationRoute: VerificationRoute,
+  EmailsItemIdRoute: EmailsItemIdRoute,
   ItemsItemIdRoute: ItemsItemIdRoute,
   RfqsRfqIdRoute: RfqsRfqIdRoute,
 }
