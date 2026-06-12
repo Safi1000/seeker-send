@@ -1,18 +1,19 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Upload,
-  ListChecks,
   ShieldAlert,
   Activity,
   Settings,
-  Moon,
-  Sun,
   Boxes,
+  ListChecks,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useTheme } from "./theme-provider";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "./theme-toggle";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -23,8 +24,8 @@ const nav = [
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { theme, toggle } = useTheme();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const pathname = usePathname() ?? "/";
+  const isActive = (to: string) => (to === "/" ? pathname === "/" : pathname.startsWith(to));
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -35,18 +36,18 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Boxes className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-sm font-semibold">Procura AI</div>
+              <div className="text-sm font-semibold">RFQ Automation</div>
               <div className="text-xs text-muted-foreground">Procurement Assistant</div>
             </div>
           </div>
           <nav className="flex-1 space-y-1 px-3 py-4">
             {nav.map((n) => {
-              const active = n.to === "/" ? pathname === "/" : pathname.startsWith(n.to);
+              const active = isActive(n.to);
               const Icon = n.icon;
               return (
                 <Link
                   key={n.to}
-                  to={n.to}
+                  href={n.to}
                   className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                     active
@@ -61,8 +62,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
           </nav>
           <div className="border-t border-sidebar-border p-4 text-xs text-muted-foreground">
-            <div className="font-medium text-sidebar-foreground">Operations Team</div>
-            <div>buyer@acme.com</div>
+            <div className="font-medium text-sidebar-foreground">Procurement Officer</div>
+            <div>Low-volume RFQ workflow</div>
           </div>
         </aside>
 
@@ -71,16 +72,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-2">
               <ListChecks className="h-4 w-4 text-muted-foreground md:hidden" />
               <span className="text-sm font-medium text-muted-foreground">
-                {nav.find((n) => (n.to === "/" ? pathname === "/" : pathname.startsWith(n.to)))?.label ?? "Procura AI"}
+                {nav.find((n) => isActive(n.to))?.label ?? "RFQ Automation"}
               </span>
             </div>
-            <button
-              onClick={toggle}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-foreground hover:bg-accent"
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
+            <ThemeToggle />
           </header>
           <div className="flex-1 p-6">{children}</div>
         </main>

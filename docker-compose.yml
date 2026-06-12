@@ -1,0 +1,14 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rfq-automation-platform
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      # Override at runtime if needed; .env supplies the rest.
+      NODE_ENV: production
+    restart: unless-stopped
