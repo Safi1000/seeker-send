@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { findRfq } from "@/lib/mock-data";
+import type { RfqItem } from "@/lib/mock-data";
 import { StatusBadge } from "@/components/status-badge";
 
 export const Route = createFileRoute("/rfqs/$rfqId")({
@@ -45,7 +46,7 @@ function RfqPage() {
               {rfq.items.length === 0 && (
                 <tr><td colSpan={8} className="px-5 py-8 text-center text-sm text-muted-foreground">No items loaded.</td></tr>
               )}
-              {rfq.items.map((i) => (
+              {rfq.items.map((i: RfqItem) => (
                 <tr key={i.id} className="border-b border-border last:border-0 hover:bg-muted/40">
                   <td className="px-5 py-3 tabular-nums text-muted-foreground">{i.itemNumber}</td>
                   <td className="px-5 py-3 font-mono text-xs">{i.partNumber}</td>
