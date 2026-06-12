@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getItem, getRfq, getSuppliersForItem } from "@/lib/repo";
 import { generateEmail } from "@/lib/email/template";
-import { getOutlookStatus } from "@/lib/email/graph";
+import { getOutlookStatus } from "@/lib/email/smtp";
 import { EmailEditor } from "./email-editor";
 
 export const dynamic = "force-dynamic";

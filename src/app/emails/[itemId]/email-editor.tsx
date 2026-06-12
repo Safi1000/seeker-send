@@ -82,7 +82,7 @@ export function EmailEditor({
       {!outlookConnected && !mock && (
         <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          Outlook is not connected. Connect it in{" "}
+          Outlook email is not configured. Set it up in{" "}
           <a href="/settings" className="font-medium underline">
             Settings
           </a>{" "}

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getItem, getSupplier, createEmailLog, updateItemStatus } from "@/lib/repo";
-import { sendOutlookEmail } from "@/lib/email/graph";
+import { sendOutlookEmail } from "@/lib/email/smtp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

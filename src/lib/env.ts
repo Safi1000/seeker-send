@@ -35,20 +35,19 @@ export function getEnv() {
 
     storageBucket: process.env.SUPABASE_STORAGE_BUCKET ?? "rfq-pdfs",
 
-    // Microsoft Graph / Outlook OAuth.
-    msTenantId: process.env.MS_TENANT_ID ?? "common",
-    msClientId: process.env.MS_CLIENT_ID,
-    msClientSecret: process.env.MS_CLIENT_SECRET,
-    msRedirectUri:
-      process.env.MS_REDIRECT_URI ??
-      `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/auth/outlook/callback`,
-    msGraphConfigured: Boolean(process.env.MS_CLIENT_ID && process.env.MS_CLIENT_SECRET),
+    // Outlook SMTP (personal account + app password). No Azure required.
+    smtpHost: process.env.SMTP_HOST ?? "smtp-mail.outlook.com",
+    smtpPort: Number(process.env.SMTP_PORT ?? 587),
+    smtpUser: process.env.SMTP_USER, // your Outlook email address
+    smtpPass: process.env.SMTP_PASS, // an Outlook app password (not your login password)
+    smtpFrom: process.env.SMTP_FROM ?? process.env.SMTP_USER,
+    smtpConfigured: Boolean(process.env.SMTP_USER && process.env.SMTP_PASS),
 
     // Mock switches. Default to mock when the relevant service is unconfigured.
     mockSearch: bool(process.env.MOCK_SEARCH, false),
     mockEmail: bool(
       process.env.MOCK_EMAIL,
-      !(process.env.MS_CLIENT_ID && process.env.MS_CLIENT_SECRET),
+      !(process.env.SMTP_USER && process.env.SMTP_PASS),
     ),
 
     // Search tuning.

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOutlookStatus } from "@/lib/email/graph";
+import { getOutlookStatus } from "@/lib/email/smtp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

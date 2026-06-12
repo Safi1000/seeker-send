@@ -18,10 +18,10 @@ microservices.
 | Backend      | Next.js API Routes (Node runtime)                     |
 | Database     | Supabase (Postgres)                                   |
 | Storage      | Supabase Storage (RFQ PDFs)                            |
-| Auth         | Supabase Auth                                         |
+| Auth         | None — single-operator, private deployment            |
 | PDF parsing  | `pdf-parse` → `pdfjs-dist` → `tesseract.js` (OCR fallback) |
 | Web search   | Playwright (headless Chromium) + DuckDuckGo           |
-| Email        | Microsoft Graph API + Outlook OAuth                   |
+| Email        | Outlook SMTP via Nodemailer (app password, no Azure)  |
 
 ---
 
@@ -84,30 +84,30 @@ You already have a Supabase project. Wire it up:
 The server reads/writes data with the service-role key (RLS-bypassing). As soon
 as these are present, the in-memory fallback is no longer used.
 
-### 2. Outlook / Microsoft Graph (for real email sending)
+### 2. Outlook email via SMTP (for real email sending)
 
-Register an app in **Microsoft Entra ID (Azure AD)**:
+No Azure / app registration required — a personal Outlook.com account with an
+**app password** is all you need:
 
-1. Entra admin center → *App registrations* → *New registration*.
-2. Supported account types: *Accounts in any organizational directory and
-   personal Microsoft accounts* (or as appropriate).
-3. **Redirect URI** (type *Web*):
-   `http://localhost:3000/api/auth/outlook/callback`
-   (for production use your real domain).
-4. *Certificates & secrets* → create a **client secret**.
-5. *API permissions* → add **delegated** Microsoft Graph permissions:
-   `Mail.Send`, `User.Read`, `offline_access`. Grant consent.
-6. Put the values in `.env.local`:
+1. Enable **2-step verification** on your Microsoft account:
+   <https://account.microsoft.com/security>
+2. Create an **app password**: <https://account.live.com/proofs/AppPassword>
+3. Put the values in `.env.local`:
 
    ```env
-   MS_TENANT_ID=common
-   MS_CLIENT_ID=...
-   MS_CLIENT_SECRET=...
+   SMTP_HOST=smtp-mail.outlook.com
+   SMTP_PORT=587
+   SMTP_USER=your-address@outlook.com
+   SMTP_PASS=your-app-password
    MOCK_EMAIL=false
    ```
 
-7. Start the app, go to **Settings → Connect Outlook**, and authorize. The
-   token set is stored in `ms_oauth_tokens` and refreshed automatically.
+4. Restart the app. **Settings** will show “Configured”. Emails are sent over
+   SMTP from your Outlook address; each send is logged in `email_logs`.
+
+> Note: basic-auth SMTP works for **personal** Outlook.com / Hotmail / Live
+> accounts. Work / Microsoft 365 mailboxes have it disabled and would need the
+> Microsoft Graph API instead.
 
 ### 3. Run
 
@@ -151,9 +151,7 @@ Recommended targets:
 Checklist:
 
 1. Set all production env vars (`.env`), including a public `NEXT_PUBLIC_APP_URL`.
-2. Add the production redirect URI
-   (`https://your-domain/api/auth/outlook/callback`) to the Azure app
-   registration.
+2. Set `SMTP_USER` / `SMTP_PASS` (Outlook app password) and `MOCK_EMAIL=false`.
 3. Run the SQL migration against your Supabase project.
 4. `docker compose up -d --build`.
 
@@ -169,11 +167,8 @@ Checklist:
 | GET    | `/api/items/[id]`                  | Item + suppliers                     |
 | POST   | `/api/items/[id]/search`           | Run exact-match supplier search      |
 | POST   | `/api/emails/preview`              | Generate the RFQ email draft         |
-| POST   | `/api/emails/send`                 | Send via Outlook + log               |
-| GET    | `/api/auth/outlook`                | Begin Outlook OAuth                  |
-| GET    | `/api/auth/outlook/callback`       | OAuth redirect target                |
-| GET    | `/api/auth/outlook/status`         | Connection status                    |
-| POST   | `/api/auth/outlook/disconnect`     | Clear stored tokens                  |
+| POST   | `/api/emails/send`                 | Send via Outlook SMTP + log          |
+| GET    | `/api/auth/outlook/status`         | Email (SMTP) configuration status    |
 
 ---
 
@@ -189,7 +184,7 @@ src/
     verification/            Verification queue
     emails/[itemId]/         Email preview & send
     progress/                Search progress
-    settings/                Outlook connection
+    settings/                Outlook SMTP status
     api/                     API routes (see table above)
   lib/
     env.ts                   Typed env + mock switches

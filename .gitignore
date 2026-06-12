@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Supabase / uploads
 /tmp/uploads
+
+# TypeScript incremental build info
+tsconfig.tsbuildinfo
