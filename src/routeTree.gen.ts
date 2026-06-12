@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerificationRouteImport } from './routes/verification'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RfqsRfqIdRouteImport } from './routes/rfqs.$rfqId'
@@ -25,6 +26,11 @@ const VerificationRoute = VerificationRouteImport.update({
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProgressRoute = ProgressRouteImport.update({
@@ -56,6 +62,7 @@ const EmailsItemIdRoute = EmailsItemIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/progress': typeof ProgressRoute
+  '/settings': typeof SettingsRoute
   '/upload': typeof UploadRoute
   '/verification': typeof VerificationRoute
   '/emails/$itemId': typeof EmailsItemIdRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/progress': typeof ProgressRoute
+  '/settings': typeof SettingsRoute
   '/upload': typeof UploadRoute
   '/verification': typeof VerificationRoute
   '/emails/$itemId': typeof EmailsItemIdRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/progress': typeof ProgressRoute
+  '/settings': typeof SettingsRoute
   '/upload': typeof UploadRoute
   '/verification': typeof VerificationRoute
   '/emails/$itemId': typeof EmailsItemIdRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/progress'
+    | '/settings'
     | '/upload'
     | '/verification'
     | '/emails/$itemId'
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/progress'
+    | '/settings'
     | '/upload'
     | '/verification'
     | '/emails/$itemId'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/progress'
+    | '/settings'
     | '/upload'
     | '/verification'
     | '/emails/$itemId'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ProgressRoute: typeof ProgressRoute
+  SettingsRoute: typeof SettingsRoute
   UploadRoute: typeof UploadRoute
   VerificationRoute: typeof VerificationRoute
   EmailsItemIdRoute: typeof EmailsItemIdRoute
@@ -135,6 +148,13 @@ declare module '@tanstack/react-router' {
       path: '/upload'
       fullPath: '/upload'
       preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/progress': {
@@ -178,6 +198,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ProgressRoute: ProgressRoute,
+  SettingsRoute: SettingsRoute,
   UploadRoute: UploadRoute,
   VerificationRoute: VerificationRoute,
   EmailsItemIdRoute: EmailsItemIdRoute,
