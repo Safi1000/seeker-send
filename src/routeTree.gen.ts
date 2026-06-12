@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerificationRouteImport } from './routes/verification'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RfqsRfqIdRouteImport } from './routes/rfqs.$rfqId'
 import { Route as ItemsItemIdRouteImport } from './routes/items.$itemId'
 
+const VerificationRoute = VerificationRouteImport.update({
+  id: '/verification',
+  path: '/verification',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
@@ -38,12 +44,14 @@ const ItemsItemIdRoute = ItemsItemIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/upload': typeof UploadRoute
+  '/verification': typeof VerificationRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/rfqs/$rfqId': typeof RfqsRfqIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/upload': typeof UploadRoute
+  '/verification': typeof VerificationRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/rfqs/$rfqId': typeof RfqsRfqIdRoute
 }
@@ -51,26 +59,46 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/upload': typeof UploadRoute
+  '/verification': typeof VerificationRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/rfqs/$rfqId': typeof RfqsRfqIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/upload' | '/items/$itemId' | '/rfqs/$rfqId'
+  fullPaths:
+    | '/'
+    | '/upload'
+    | '/verification'
+    | '/items/$itemId'
+    | '/rfqs/$rfqId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/upload' | '/items/$itemId' | '/rfqs/$rfqId'
-  id: '__root__' | '/' | '/upload' | '/items/$itemId' | '/rfqs/$rfqId'
+  to: '/' | '/upload' | '/verification' | '/items/$itemId' | '/rfqs/$rfqId'
+  id:
+    | '__root__'
+    | '/'
+    | '/upload'
+    | '/verification'
+    | '/items/$itemId'
+    | '/rfqs/$rfqId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   UploadRoute: typeof UploadRoute
+  VerificationRoute: typeof VerificationRoute
   ItemsItemIdRoute: typeof ItemsItemIdRoute
   RfqsRfqIdRoute: typeof RfqsRfqIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verification': {
+      id: '/verification'
+      path: '/verification'
+      fullPath: '/verification'
+      preLoaderRoute: typeof VerificationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/upload': {
       id: '/upload'
       path: '/upload'
@@ -105,6 +133,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   UploadRoute: UploadRoute,
+  VerificationRoute: VerificationRoute,
   ItemsItemIdRoute: ItemsItemIdRoute,
   RfqsRfqIdRoute: RfqsRfqIdRoute,
 }
