@@ -9,38 +9,161 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerificationRouteImport } from './routes/verification'
+import { Route as UploadRouteImport } from './routes/upload'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as RfqsRfqIdRouteImport } from './routes/rfqs.$rfqId'
+import { Route as ItemsItemIdRouteImport } from './routes/items.$itemId'
+import { Route as EmailsItemIdRouteImport } from './routes/emails.$itemId'
 
+const VerificationRoute = VerificationRouteImport.update({
+  id: '/verification',
+  path: '/verification',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UploadRoute = UploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProgressRoute = ProgressRouteImport.update({
+  id: '/progress',
+  path: '/progress',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RfqsRfqIdRoute = RfqsRfqIdRouteImport.update({
+  id: '/rfqs/$rfqId',
+  path: '/rfqs/$rfqId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ItemsItemIdRoute = ItemsItemIdRouteImport.update({
+  id: '/items/$itemId',
+  path: '/items/$itemId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmailsItemIdRoute = EmailsItemIdRouteImport.update({
+  id: '/emails/$itemId',
+  path: '/emails/$itemId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/progress': typeof ProgressRoute
+  '/settings': typeof SettingsRoute
+  '/upload': typeof UploadRoute
+  '/verification': typeof VerificationRoute
+  '/emails/$itemId': typeof EmailsItemIdRoute
+  '/items/$itemId': typeof ItemsItemIdRoute
+  '/rfqs/$rfqId': typeof RfqsRfqIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/progress': typeof ProgressRoute
+  '/settings': typeof SettingsRoute
+  '/upload': typeof UploadRoute
+  '/verification': typeof VerificationRoute
+  '/emails/$itemId': typeof EmailsItemIdRoute
+  '/items/$itemId': typeof ItemsItemIdRoute
+  '/rfqs/$rfqId': typeof RfqsRfqIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/progress': typeof ProgressRoute
+  '/settings': typeof SettingsRoute
+  '/upload': typeof UploadRoute
+  '/verification': typeof VerificationRoute
+  '/emails/$itemId': typeof EmailsItemIdRoute
+  '/items/$itemId': typeof ItemsItemIdRoute
+  '/rfqs/$rfqId': typeof RfqsRfqIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/progress'
+    | '/settings'
+    | '/upload'
+    | '/verification'
+    | '/emails/$itemId'
+    | '/items/$itemId'
+    | '/rfqs/$rfqId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/progress'
+    | '/settings'
+    | '/upload'
+    | '/verification'
+    | '/emails/$itemId'
+    | '/items/$itemId'
+    | '/rfqs/$rfqId'
+  id:
+    | '__root__'
+    | '/'
+    | '/progress'
+    | '/settings'
+    | '/upload'
+    | '/verification'
+    | '/emails/$itemId'
+    | '/items/$itemId'
+    | '/rfqs/$rfqId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ProgressRoute: typeof ProgressRoute
+  SettingsRoute: typeof SettingsRoute
+  UploadRoute: typeof UploadRoute
+  VerificationRoute: typeof VerificationRoute
+  EmailsItemIdRoute: typeof EmailsItemIdRoute
+  ItemsItemIdRoute: typeof ItemsItemIdRoute
+  RfqsRfqIdRoute: typeof RfqsRfqIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verification': {
+      id: '/verification'
+      path: '/verification'
+      fullPath: '/verification'
+      preLoaderRoute: typeof VerificationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/upload': {
+      id: '/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/progress': {
+      id: '/progress'
+      path: '/progress'
+      fullPath: '/progress'
+      preLoaderRoute: typeof ProgressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +171,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rfqs/$rfqId': {
+      id: '/rfqs/$rfqId'
+      path: '/rfqs/$rfqId'
+      fullPath: '/rfqs/$rfqId'
+      preLoaderRoute: typeof RfqsRfqIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/items/$itemId': {
+      id: '/items/$itemId'
+      path: '/items/$itemId'
+      fullPath: '/items/$itemId'
+      preLoaderRoute: typeof ItemsItemIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/emails/$itemId': {
+      id: '/emails/$itemId'
+      path: '/emails/$itemId'
+      fullPath: '/emails/$itemId'
+      preLoaderRoute: typeof EmailsItemIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ProgressRoute: ProgressRoute,
+  SettingsRoute: SettingsRoute,
+  UploadRoute: UploadRoute,
+  VerificationRoute: VerificationRoute,
+  EmailsItemIdRoute: EmailsItemIdRoute,
+  ItemsItemIdRoute: ItemsItemIdRoute,
+  RfqsRfqIdRoute: RfqsRfqIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
