@@ -42,6 +42,10 @@ export function getEnv() {
     smtpPass: process.env.SMTP_PASS, // an Outlook app password (not your login password)
     smtpFrom: process.env.SMTP_FROM ?? process.env.SMTP_USER,
     smtpConfigured: Boolean(process.env.SMTP_USER && process.env.SMTP_PASS),
+    // Hard upper bound (ms) on a single send. Kept below typical reverse-proxy
+    // timeouts so the API always returns JSON instead of letting the gateway
+    // kill the request with a raw 502.
+    smtpSendTimeoutMs: Number(process.env.SMTP_SEND_TIMEOUT_MS ?? 20_000),
 
     // Mock switches. Default to mock when the relevant service is unconfigured.
     mockSearch: bool(process.env.MOCK_SEARCH, false),

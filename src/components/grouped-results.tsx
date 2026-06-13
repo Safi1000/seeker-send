@@ -80,6 +80,26 @@ export interface NoContactView {
   status: string;
 }
 
+/** Send one supplier group via the API. Resolves to true on success. */
+async function postGroupSend(group: GroupView, subject: string, body: string): Promise<boolean> {
+  const res = await fetch("/api/emails/send-group", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      supplierId: group.supplierId,
+      itemIds: group.itemIds,
+      to: group.email,
+      subject,
+      body,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error ?? "Failed to send email");
+  }
+  return true;
+}
+
 export function GroupedResults({
   groups,
   noContact,
@@ -91,6 +111,55 @@ export function GroupedResults({
   mock: boolean;
   configured: boolean;
 }) {
+  const router = useRouter();
+  const canSend = configured || mock;
+
+  // Track which groups have been sent at the parent level so the "Send all"
+  // button and the individual cards stay in sync.
+  const [sentEmails, setSentEmails] = useState<Set<string>>(
+    () => new Set(groups.filter((g) => g.allSent).map((g) => g.email)),
+  );
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+  const [bulkSending, setBulkSending] = useState(false);
+
+  const pending = groups.filter((g) => !sentEmails.has(g.email));
+
+  /** Send a single group, updating shared state. Returns success. */
+  async function sendGroup(group: GroupView, subject: string, body: string): Promise<boolean> {
+    setSendingEmail(group.email);
+    try {
+      await postGroupSend(group, subject, body);
+      setSentEmails((prev) => new Set(prev).add(group.email));
+      return true;
+    } catch (err) {
+      toast.error(`${group.supplierName}: ${(err as Error).message}`);
+      return false;
+    } finally {
+      setSendingEmail(null);
+    }
+  }
+
+  /** Bulk send — sends every remaining group sequentially, one by one. */
+  async function sendAll() {
+    if (pending.length === 0 || bulkSending) return;
+    setBulkSending(true);
+    let ok = 0;
+    let failed = 0;
+    // Snapshot so cards sent mid-loop don't change what we iterate.
+    for (const group of [...pending]) {
+      const success = await sendGroup(group, group.subject, group.body);
+      if (success) ok++;
+      else failed++;
+    }
+    setBulkSending(false);
+    if (failed === 0) {
+      toast.success(`Sent ${ok} email${ok === 1 ? "" : "s"}${mock ? " (mock mode)" : ""}.`);
+    } else {
+      toast.warning(`Sent ${ok}, ${failed} failed. See errors above.`);
+    }
+    router.refresh();
+  }
+
   if (groups.length === 0 && noContact.length === 0) {
     return (
       <Card className="px-5 py-12 text-center text-sm text-muted-foreground">
@@ -112,8 +181,42 @@ export function GroupedResults({
         </div>
       )}
 
+      {groups.length > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-4 py-3">
+          <div className="text-sm text-muted-foreground">
+            {pending.length === 0 ? (
+              <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="h-4 w-4" /> All {groups.length} emails sent.
+              </span>
+            ) : (
+              <>
+                <span className="font-medium text-foreground">{pending.length}</span> of{" "}
+                {groups.length} supplier {groups.length === 1 ? "group" : "groups"} not yet sent.
+              </>
+            )}
+          </div>
+          <Button size="sm" onClick={sendAll} disabled={!canSend || bulkSending || pending.length === 0}>
+            {bulkSending ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-1.5 h-4 w-4" />
+            )}
+            {bulkSending ? "Sending…" : `Send all (${pending.length})`}
+          </Button>
+        </div>
+      )}
+
       {groups.map((g) => (
-        <GroupCard key={g.email} group={g} mock={mock} canSend={configured || mock} />
+        <GroupCard
+          key={g.email}
+          group={g}
+          mock={mock}
+          canSend={canSend}
+          sent={sentEmails.has(g.email)}
+          sending={sendingEmail === g.email}
+          bulkSending={bulkSending}
+          onSend={sendGroup}
+        />
       ))}
 
       {noContact.length > 0 && (
@@ -141,45 +244,30 @@ function GroupCard({
   group,
   mock,
   canSend,
+  sent,
+  sending,
+  bulkSending,
+  onSend,
 }: {
   group: GroupView;
   mock: boolean;
   canSend: boolean;
+  sent: boolean;
+  sending: boolean;
+  bulkSending: boolean;
+  onSend: (group: GroupView, subject: string, body: string) => Promise<boolean>;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [subject, setSubject] = useState(group.subject);
   const [body, setBody] = useState(group.body);
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(group.allSent);
 
   async function send() {
-    setSending(true);
-    try {
-      const res = await fetch("/api/emails/send-group", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          supplierId: group.supplierId,
-          itemIds: group.itemIds,
-          to: group.email,
-          subject,
-          body,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error ?? "Failed to send email");
-        return;
-      }
-      setSent(true);
+    const ok = await onSend(group, subject, body);
+    if (ok) {
       setOpen(false);
       toast.success(mock ? "Email sent (mock mode)." : "Email sent via Outlook.");
       router.refresh();
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setSending(false);
     }
   }
 
@@ -242,9 +330,17 @@ function GroupCard({
               </a>
             </Button>
           )}
-          <Button size="sm" disabled={!canSend || sent} onClick={() => setOpen(true)}>
-            <Send className="mr-1 h-3.5 w-3.5" />
-            {sent ? "Sent" : `Send Email (${group.items.length})`}
+          <Button
+            size="sm"
+            disabled={!canSend || sent || sending || bulkSending}
+            onClick={() => setOpen(true)}
+          >
+            {sending ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Send className="mr-1 h-3.5 w-3.5" />
+            )}
+            {sent ? "Sent" : sending ? "Sending…" : `Send Email (${group.items.length})`}
           </Button>
         </div>
       </div>
@@ -289,7 +385,7 @@ function GroupCard({
             <Button variant="outline" onClick={() => setOpen(false)} disabled={sending}>
               Cancel
             </Button>
-            <Button onClick={send} disabled={sending}>
+            <Button onClick={send} disabled={sending || bulkSending}>
               {sending ? (
                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
               ) : (
