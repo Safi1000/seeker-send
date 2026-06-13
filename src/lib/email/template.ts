@@ -3,6 +3,11 @@ import type { RfqItem } from "@/lib/types";
 /**
  * Generate the RFQ email exactly per the required format. Fields that are
  * empty/null are omitted entirely — no blank lines for missing data.
+ *
+ * Two flavours:
+ *   - generateEmail()      — a single item (kept for the per-item flow).
+ *   - generateGroupEmail() — several items addressed to the same recipient,
+ *     with one header/closing and one block per item.
  */
 
 export interface GeneratedEmail {
@@ -14,24 +19,9 @@ function hasValue(v: unknown): v is string | number {
   return v !== null && v !== undefined && String(v).trim() !== "";
 }
 
-export function generateEmail(
-  item: RfqItem,
-  referenceNumber: string,
-  date: string,
-): GeneratedEmail {
+/** The per-item detail block (everything between the header and the closing). */
+function itemBlock(item: RfqItem): string[] {
   const lines: string[] = [];
-
-  lines.push("Dear Sales / Purchasing Team,");
-  lines.push("");
-  lines.push(
-    "Please quote your lowest best prices for the following items with gross weight & dimensions.",
-  );
-  lines.push("");
-  lines.push("ITEMS SHOULD BE BRAND NEW FACTORY PACKAGE");
-  lines.push("");
-  lines.push(`Our Ref. No. ${referenceNumber}`);
-  lines.push(`Dated: ${date}`);
-  lines.push("");
   lines.push(`Item ${item.item_number}`);
   lines.push("");
 
@@ -45,13 +35,10 @@ export function generateEmail(
     lines.push("");
   }
 
-  // The labelled spec block — only render fields that exist.
   if (hasValue(item.box_size)) lines.push(`BOX SIZE: ${item.box_size}`);
   if (hasValue(item.application)) lines.push(`APPLICATION: ${item.application}`);
   if (hasValue(item.analyzer_model)) lines.push(`ANALYZER MODEL: ${item.analyzer_model}`);
   if (hasValue(item.tag_number)) lines.push(`TAG NO: ${item.tag_number}`);
-
-  // Add spacing only if at least one of the labelled fields rendered.
   if (
     hasValue(item.box_size) ||
     hasValue(item.application) ||
@@ -72,12 +59,54 @@ export function generateEmail(
     lines.push("");
   }
 
-  lines.push("Best regards.");
+  return lines;
+}
 
-  const body = lines.join("\n");
+function header(referenceNumber: string, date: string): string[] {
+  return [
+    "Dear Sales / Purchasing Team,",
+    "",
+    "Please quote your lowest best prices for the following items with gross weight & dimensions.",
+    "",
+    "ITEMS SHOULD BE BRAND NEW FACTORY PACKAGE",
+    "",
+    `Our Ref. No. ${referenceNumber}`,
+    `Dated: ${date}`,
+    "",
+  ];
+}
+
+export function generateEmail(
+  item: RfqItem,
+  referenceNumber: string,
+  date: string,
+): GeneratedEmail {
+  const lines = [...header(referenceNumber, date), ...itemBlock(item), "Best regards."];
   const subject = `RFQ ${referenceNumber} — Item ${item.item_number}${
     hasValue(item.part_number) ? ` (${item.part_number})` : ""
   }`;
+  return { subject, body: lines.join("\n") };
+}
 
-  return { subject, body };
+/**
+ * One email covering several items addressed to the same supplier/recipient.
+ * Items are ordered by their display number.
+ */
+export function generateGroupEmail(
+  items: RfqItem[],
+  referenceNumber: string,
+  date: string,
+): GeneratedEmail {
+  const ordered = [...items].sort((a, b) => a.item_number - b.item_number);
+  const lines = [...header(referenceNumber, date)];
+  for (const item of ordered) lines.push(...itemBlock(item));
+  lines.push("Best regards.");
+
+  const nums = ordered.map((i) => i.item_number).join(", ");
+  const subject =
+    ordered.length === 1
+      ? `RFQ ${referenceNumber} — Item ${nums}`
+      : `RFQ ${referenceNumber} — Items ${nums}`;
+
+  return { subject, body: lines.join("\n") };
 }

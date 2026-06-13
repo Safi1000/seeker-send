@@ -20,7 +20,7 @@ microservices.
 | Storage      | Supabase Storage (RFQ PDFs)                            |
 | Auth         | None — single-operator, private deployment            |
 | PDF parsing  | `pdf-parse` → `pdfjs-dist` → `tesseract.js` (OCR fallback) |
-| Web search   | Playwright (headless Chromium) + DuckDuckGo           |
+| Web search   | Serper.dev (Google results API) + Playwright (headless Chromium) |
 | Email        | Outlook SMTP via Nodemailer (app password, no Azure)  |
 
 ---
@@ -118,42 +118,25 @@ npm run build && npm start   # production (Node)
 
 ---
 
-## Docker
-
-The image is built on the official Playwright base (Chromium + system libs for
-OCR/canvas are preinstalled).
-
-```bash
-cp .env.example .env          # fill in real values
-docker compose up --build     # http://localhost:3000
-```
-
-or plain Docker:
-
-```bash
-docker build -t rfq-automation-platform .
-docker run --env-file .env -p 3000:3000 rfq-automation-platform
-```
-
----
-
 ## Deployment
 
 This is a **self-hosted Node application** (it must be — Playwright, `pdf-parse`
-and Tesseract OCR cannot run on edge/serverless runtimes).
+and Tesseract OCR cannot run on edge/serverless runtimes). Run it on any VPS / VM
+(DigitalOcean, Hetzner, EC2, etc.), ideally behind a reverse proxy (Caddy/Nginx)
+terminating TLS.
 
-Recommended targets:
-
-- **Any VPS / VM** (DigitalOcean, Hetzner, EC2, etc.): `docker compose up -d`
-  behind a reverse proxy (Caddy/Nginx) terminating TLS.
-- **Fly.io / Railway / Render**: deploy the Dockerfile directly.
+```bash
+npm ci                       # installs deps + Playwright Chromium (postinstall)
+npm run build
+npm start                    # serves on :3000 (use a process manager like pm2)
+```
 
 Checklist:
 
 1. Set all production env vars (`.env`), including a public `NEXT_PUBLIC_APP_URL`.
 2. Set `SMTP_USER` / `SMTP_PASS` (Outlook app password) and `MOCK_EMAIL=false`.
-3. Run the SQL migration against your Supabase project.
-4. `docker compose up -d --build`.
+3. Set `SERPER_API_KEY` (and `MOCK_SEARCH=false`) for real supplier search.
+4. Run the SQL migration against your Supabase project.
 
 ---
 
@@ -193,11 +176,10 @@ src/
     storage.ts               PDF storage (Supabase Storage OR local)
     supabase/                Browser / server / admin clients
     pdf/                     extract.ts (+ OCR), parse-items.ts (10 fields)
-    search/                  index.ts (Playwright), matching.ts (exact match)
-    email/                   template.ts, graph.ts, token-store.ts
+    search/                  index.ts (Serper + Playwright), matching.ts (exact match)
+    email/                   template.ts (RFQ format), smtp.ts (Outlook SMTP)
   components/                app-shell, status-badge, theme, ui/ (Shadcn)
 supabase/migrations/0001_init.sql
-Dockerfile, docker-compose.yml
 ```
 
 ---

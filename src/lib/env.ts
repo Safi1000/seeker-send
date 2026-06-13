@@ -50,7 +50,10 @@ export function getEnv() {
       !(process.env.SMTP_USER && process.env.SMTP_PASS),
     ),
 
-    // Search tuning.
+    // Supplier search — Serper.dev (real Google results via API).
+    // Free 2,500 queries on signup. Needs a single API key.
+    serperApiKey: process.env.SERPER_API_KEY,
+    serperConfigured: Boolean(process.env.SERPER_API_KEY),
     searchMaxResults: Number(process.env.SEARCH_MAX_RESULTS ?? 8),
   };
 }

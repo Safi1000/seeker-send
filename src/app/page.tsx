@@ -3,6 +3,7 @@ import { FileText, PackageSearch, Building2, MailCheck, ArrowRight } from "lucid
 import { getDashboardStats, listRfqs, getItemsForRfq } from "@/lib/repo";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DeleteRfqButton } from "@/components/delete-rfq-button";
 export const dynamic = "force-dynamic";
 
 const CARDS = [
@@ -85,9 +86,17 @@ export default async function DashboardPage() {
                   <td className="px-5 py-3 tabular-nums">{total}</td>
                   <td className="px-5 py-3 tabular-nums">{sent}</td>
                   <td className="px-5 py-3 text-right">
-                    <Link href={`/rfqs/${rfq.id}`} className="text-primary hover:underline">
-                      View
-                    </Link>
+                    <div className="flex items-center justify-end gap-3">
+                      <Link href={`/rfqs/${rfq.id}`} className="text-primary hover:underline">
+                        View
+                      </Link>
+                      <DeleteRfqButton
+                        rfqId={rfq.id}
+                        reference={rfq.reference_number}
+                        variant="ghost"
+                        after="refresh"
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}

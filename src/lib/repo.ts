@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { deleteRfqPdf } from "@/lib/storage";
 import type {
   DashboardStats,
   EmailLog,
@@ -91,6 +92,7 @@ function seed(): MemStore {
       product_url: "https://www.servomex.com/parts/2010b-2111-ms",
       email: "sales@servomex.com",
       email_source_url: "https://www.servomex.com/contact",
+      match_type: "PART_NUMBER",
     },
     {
       id: "seed-sup-2",
@@ -100,6 +102,7 @@ function seed(): MemStore {
       product_url: "https://www.mt.com/m400",
       email: "process.sales@mt.com",
       email_source_url: "https://www.mt.com/about",
+      match_type: "PART_NUMBER",
     },
   ];
   return {
@@ -173,6 +176,35 @@ export async function createRfq(input: {
   };
   mem().rfqs.push(rfq);
   return rfq;
+}
+
+/**
+ * Delete an RFQ and ALL its data: items, suppliers and email logs (via DB
+ * cascade) plus the stored PDF. In-memory mode cascades manually.
+ */
+export async function deleteRfq(id: string): Promise<void> {
+  const rfq = await getRfq(id);
+  if (!rfq) return;
+
+  await deleteRfqPdf(rfq.file_path);
+
+  const db = createSupabaseAdminClient();
+  if (db) {
+    // FKs are ON DELETE CASCADE: rfq_items -> suppliers -> email_logs.
+    const { error } = await db.from("rfqs").delete().eq("id", id);
+    if (error) throw error;
+    return;
+  }
+
+  const store = mem();
+  const itemIds = store.items.filter((i) => i.rfq_id === id).map((i) => i.id);
+  const supplierIds = store.suppliers
+    .filter((s) => itemIds.includes(s.rfq_item_id))
+    .map((s) => s.id);
+  store.emailLogs = store.emailLogs.filter((l) => !supplierIds.includes(l.supplier_id));
+  store.suppliers = store.suppliers.filter((s) => !itemIds.includes(s.rfq_item_id));
+  store.items = store.items.filter((i) => i.rfq_id !== id);
+  store.rfqs = store.rfqs.filter((r) => r.id !== id);
 }
 
 export async function insertItems(
@@ -259,6 +291,29 @@ export async function updateItemStatus(id: string, status: ItemStatus): Promise<
   if (item) item.status = status;
 }
 
+/** Items of an RFQ, each paired with its discovered suppliers. */
+export async function getItemsWithSuppliersForRfq(
+  rfqId: string,
+): Promise<{ item: RfqItem; suppliers: Supplier[] }[]> {
+  const items = await getItemsForRfq(rfqId);
+  const pairs = await Promise.all(
+    items.map(async (item) => ({ item, suppliers: await getSuppliersForItem(item.id) })),
+  );
+  return pairs;
+}
+
+/** Mark several items with the same status in one call. */
+export async function setItemsStatus(ids: string[], status: ItemStatus): Promise<void> {
+  if (ids.length === 0) return;
+  const db = createSupabaseAdminClient();
+  if (db) {
+    const { error } = await db.from("rfq_items").update({ status }).in("id", ids);
+    if (error) throw error;
+    return;
+  }
+  for (const item of mem().items) if (ids.includes(item.id)) item.status = status;
+}
+
 export async function getSuppliersForItem(itemId: string): Promise<Supplier[]> {
   const db = createSupabaseAdminClient();
   if (db) {
@@ -288,6 +343,7 @@ export async function replaceSuppliers(
       product_url: c.productUrl,
       email: c.email,
       email_source_url: c.emailSourceUrl,
+      match_type: c.matchType,
     }));
     const { data, error } = await db.from("suppliers").insert(rows).select("*");
     if (error) throw error;
@@ -303,6 +359,7 @@ export async function replaceSuppliers(
     product_url: c.productUrl,
     email: c.email,
     email_source_url: c.emailSourceUrl,
+    match_type: c.matchType,
   }));
   store.suppliers.push(...created);
   return created;

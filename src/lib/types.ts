@@ -48,6 +48,9 @@ export interface RfqItem {
   status: ItemStatus;
 }
 
+/** How a supplier was matched, in descending confidence. */
+export type MatchType = "PART_NUMBER" | "DESCRIPTION" | "MANUFACTURER";
+
 export interface Supplier {
   id: string;
   rfq_item_id: string;
@@ -56,7 +59,12 @@ export interface Supplier {
   product_url: string | null;
   email: string | null;
   email_source_url: string | null;
-  /** Always 100 when present (exact match) — kept for UI display. */
+  /**
+   * PART_NUMBER  = exact part number found on the page (highest confidence)
+   * DESCRIPTION  = found via full-description search (part number still verified)
+   * MANUFACTURER = manufacturer-direct, listing NOT confirmed (lowest confidence)
+   */
+  match_type: MatchType | null;
   created_at?: string;
 }
 
@@ -91,6 +99,7 @@ export interface SupplierCandidate {
   productUrl: string;
   email: string | null;
   emailSourceUrl: string | null;
+  matchType: MatchType;
 }
 
 /** Aggregate shapes used by pages. */

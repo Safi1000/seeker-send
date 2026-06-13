@@ -54,6 +54,9 @@ create table if not exists public.suppliers (
   product_url      text,
   email            text,
   email_source_url text,
+  -- How the supplier was matched: exact part number, description search, or
+  -- manufacturer-direct (listing not confirmed). Drives confidence in the UI.
+  match_type       text check (match_type in ('PART_NUMBER','DESCRIPTION','MANUFACTURER')),
   created_at       timestamptz not null default now()
 );
 create index if not exists suppliers_rfq_item_id_idx on public.suppliers(rfq_item_id);

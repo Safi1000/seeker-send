@@ -1,29 +1,22 @@
 import { NextResponse } from "next/server";
 import { getItem, replaceSuppliers, updateItemStatus, getSuppliersForItem } from "@/lib/repo";
-import { searchSuppliers } from "@/lib/search";
+import { searchSuppliersForItem } from "@/lib/search";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 /**
- * POST /api/items/[id]/search — run exact-part-number supplier discovery for
- * an item, replace its supplier set, and update its status to FOUND/NOT_FOUND.
+ * POST /api/items/[id]/search — run the escalating supplier ladder for an item
+ * (part number -> description -> manufacturer-direct), replace its supplier set,
+ * and update its status to FOUND / NOT_FOUND (flagged).
  */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const item = await getItem(id);
   if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
 
-  if (!item.part_number) {
-    await updateItemStatus(id, "NOT_FOUND");
-    return NextResponse.json(
-      { error: "Item has no part number to search.", status: "NOT_FOUND", suppliers: [] },
-      { status: 422 },
-    );
-  }
-
-  const outcome = await searchSuppliers(item.part_number);
+  const outcome = await searchSuppliersForItem(item);
   const suppliers = await replaceSuppliers(id, outcome.candidates);
   await updateItemStatus(id, outcome.result);
 

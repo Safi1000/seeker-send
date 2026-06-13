@@ -1,7 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Standalone output for a small, self-contained Docker image.
-  output: "standalone",
   // These libraries are native/heavy and must stay external to the server
   // bundle (they cannot be bundled by webpack / run on the edge).
   serverExternalPackages: [
