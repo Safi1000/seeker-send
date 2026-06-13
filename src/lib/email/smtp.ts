@@ -74,10 +74,34 @@ export async function sendOutlookEmail(params: {
     };
   }
 
-  if (!env.smtpUser || !env.smtpPass) {
-    return { status: "FAILED", messageId: null, error: "Outlook SMTP is not configured." };
+  // Primary path: send directly from the real @rifetechsolutions.com mailbox
+  // over SMTP. If that fails (e.g. the deploy host blocks outbound SMTP, the
+  // original "Connection timeout"), fall back to Resend over HTTPS so an email
+  // still goes out.
+  if (env.smtpConfigured) {
+    const smtpResult = await sendViaSmtp(params);
+    if (smtpResult.status === "SENT") return smtpResult;
+    if (env.resendConfigured) {
+      const fallback = await sendViaResend(params);
+      if (fallback.status === "SENT") return fallback;
+    }
+    return smtpResult; // surface the original SMTP error
   }
 
+  if (env.resendConfigured) {
+    return sendViaResend(params);
+  }
+
+  return { status: "FAILED", messageId: null, error: "Email sending is not configured." };
+}
+
+/** Send a plain-text email over SMTP (pooled transporter + hard timeout). */
+async function sendViaSmtp(params: {
+  to: string;
+  subject: string;
+  body: string;
+}): Promise<SendResult> {
+  const env = getEnv();
   try {
     const transporter = getTransporter();
 
@@ -98,6 +122,68 @@ export async function sendOutlookEmail(params: {
     return { status: "SENT", messageId: info.messageId ?? null };
   } catch (err) {
     return { status: "FAILED", messageId: null, error: (err as Error).message };
+  }
+}
+
+/**
+ * Send a plain-text email via the Resend HTTP API (https, port 443).
+ *
+ * No SDK dependency — a single fetch to the REST endpoint. Bounded by an
+ * AbortController so a slow network can't hang the request.
+ */
+async function sendViaResend(params: {
+  to: string;
+  subject: string;
+  body: string;
+}): Promise<SendResult> {
+  const env = getEnv();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), env.smtpSendTimeoutMs);
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: env.resendFrom,
+        to: [params.to],
+        // Replies go to the Outlook address, not the verified sending domain.
+        ...(env.resendReplyTo ? { reply_to: env.resendReplyTo } : {}),
+        subject: params.subject,
+        text: params.body, // plain text only
+      }),
+      signal: controller.signal,
+    });
+
+    const data = (await res.json().catch(() => ({}))) as {
+      id?: string;
+      message?: string;
+      name?: string;
+    };
+
+    if (!res.ok) {
+      return {
+        status: "FAILED",
+        messageId: null,
+        error: data.message ?? data.name ?? `Resend error (HTTP ${res.status}).`,
+      };
+    }
+
+    return { status: "SENT", messageId: data.id ?? null };
+  } catch (err) {
+    const aborted = (err as Error).name === "AbortError";
+    return {
+      status: "FAILED",
+      messageId: null,
+      error: aborted
+        ? `Email send timed out after ${Math.round(env.smtpSendTimeoutMs / 1000)}s.`
+        : (err as Error).message,
+    };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -128,21 +214,33 @@ export interface OutlookStatus {
   configured: boolean;
 }
 
-/** SMTP "connection" status for the settings UI. */
+/** Email "connection" status for the settings/send UI. */
 export async function getOutlookStatus(): Promise<OutlookStatus> {
   const env = getEnv();
   if (env.mockEmail) {
     return {
       connected: true,
-      accountEmail: env.smtpFrom ?? "mock@outlook.local",
+      accountEmail: env.resendFrom ?? env.smtpFrom ?? "mock@outlook.local",
       mock: true,
-      configured: env.smtpConfigured,
+      configured: env.resendConfigured || env.smtpConfigured,
     };
   }
-  return {
-    connected: env.smtpConfigured,
-    accountEmail: env.smtpConfigured ? (env.smtpFrom ?? env.smtpUser ?? null) : null,
-    mock: false,
-    configured: env.smtpConfigured,
-  };
+  // SMTP (the real mailbox) takes precedence; Resend is the fallback.
+  if (env.smtpConfigured) {
+    return {
+      connected: true,
+      accountEmail: env.smtpFrom ?? env.smtpUser ?? null,
+      mock: false,
+      configured: true,
+    };
+  }
+  if (env.resendConfigured) {
+    return {
+      connected: true,
+      accountEmail: env.resendFrom ?? null,
+      mock: false,
+      configured: true,
+    };
+  }
+  return { connected: false, accountEmail: null, mock: false, configured: false };
 }
