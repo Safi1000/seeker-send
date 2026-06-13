@@ -6,6 +6,8 @@ import { UploadCloud, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 type Phase = "idle" | "extracting" | "scanning";
@@ -14,6 +16,7 @@ export default function UploadPage() {
   const router = useRouter();
   const [dragOver, setDragOver] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
+  const [reference, setReference] = useState("");
   const [scanTotal, setScanTotal] = useState(0);
   const [scanDone, setScanDone] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -29,6 +32,7 @@ export default function UploadPage() {
         // 1. Upload + extract items.
         const fd = new FormData();
         fd.append("file", file);
+        if (reference.trim()) fd.append("reference_number", reference.trim());
         const res = await fetch("/api/rfqs/upload", { method: "POST", body: fd });
         const data = await res.json();
         if (!res.ok) {
@@ -60,7 +64,7 @@ export default function UploadPage() {
         setPhase("idle");
       }
     },
-    [router],
+    [router, reference],
   );
 
   const onDrop = useCallback(
@@ -84,6 +88,21 @@ export default function UploadPage() {
           Drop an RFQ PDF — items are extracted and suppliers are found automatically.
         </p>
       </div>
+
+      <Card className="space-y-2 p-5">
+        <Label htmlFor="reference">Your reference number (optional)</Label>
+        <Input
+          id="reference"
+          placeholder="e.g. RFQ-2026-0142"
+          value={reference}
+          onChange={(e) => setReference(e.target.value)}
+          disabled={busy}
+        />
+        <p className="text-xs text-muted-foreground">
+          Used as “Our Ref. No.” in every email sent for items in this RFQ. Leave blank to derive it
+          from the file name.
+        </p>
+      </Card>
 
       <Card
         onDragOver={(e) => {
