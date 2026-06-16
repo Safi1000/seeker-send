@@ -1,6 +1,7 @@
 import "server-only";
 import nodemailer, { type Transporter } from "nodemailer";
 import { getEnv } from "@/lib/env";
+import { appendToSent } from "./imap";
 
 /**
  * A single pooled transporter is reused across requests. Building a fresh
@@ -78,21 +79,48 @@ export async function sendOutlookEmail(params: {
   // over SMTP. If that fails (e.g. the deploy host blocks outbound SMTP, the
   // original "Connection timeout"), fall back to Resend over HTTPS so an email
   // still goes out.
+  let result: SendResult = {
+    status: "FAILED",
+    messageId: null,
+    error: "Email sending is not configured.",
+  };
+  // The address the recipient actually saw, so the Sent-folder copy matches.
+  let fromUsed: string | null = null;
+  let replyToUsed: string | null = null;
+
   if (env.smtpConfigured) {
-    const smtpResult = await sendViaSmtp(params);
-    if (smtpResult.status === "SENT") return smtpResult;
-    if (env.resendConfigured) {
+    result = await sendViaSmtp(params);
+    if (result.status === "SENT") {
+      fromUsed = env.smtpFrom ?? env.smtpUser ?? null;
+    } else if (env.resendConfigured) {
       const fallback = await sendViaResend(params);
-      if (fallback.status === "SENT") return fallback;
+      if (fallback.status === "SENT") {
+        result = fallback;
+        fromUsed = env.resendFrom ?? null;
+        replyToUsed = env.resendReplyTo ?? null;
+      }
     }
-    return smtpResult; // surface the original SMTP error
+  } else if (env.resendConfigured) {
+    result = await sendViaResend(params);
+    if (result.status === "SENT") {
+      fromUsed = env.resendFrom ?? null;
+      replyToUsed = env.resendReplyTo ?? null;
+    }
   }
 
-  if (env.resendConfigured) {
-    return sendViaResend(params);
+  // Best-effort: drop a copy in the mailbox's Sent folder so the send shows up
+  // in Outlook. Never let this affect the send result.
+  if (result.status === "SENT" && fromUsed) {
+    void appendToSent({
+      from: fromUsed,
+      to: params.to,
+      subject: params.subject,
+      body: params.body,
+      replyTo: replyToUsed,
+    });
   }
 
-  return { status: "FAILED", messageId: null, error: "Email sending is not configured." };
+  return result;
 }
 
 /** Send a plain-text email over SMTP (pooled transporter + hard timeout). */

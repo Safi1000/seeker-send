@@ -101,6 +101,13 @@ export function getEnv() {
     smtpPass,
     smtpFrom: process.env.SMTP_FROM ?? smtpUser,
     smtpConfigured: smtpReady,
+
+    // IMAP — used only to drop a copy of each sent email into the mailbox's
+    // "Sent" folder (so sends show up in Outlook). Same host/creds as SMTP.
+    imapHost: process.env.IMAP_HOST ?? process.env.SMTP_HOST ?? HARDCODED_SMTP_HOST,
+    imapPort: Number(process.env.IMAP_PORT ?? 993),
+    // Save a Sent-folder copy after each successful send (best-effort).
+    saveToSent: bool(process.env.SAVE_TO_SENT, true),
     // Hard upper bound (ms) on a single send. Kept below typical reverse-proxy
     // timeouts so the API always returns JSON instead of letting the gateway
     // kill the request with a raw 502.
