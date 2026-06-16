@@ -46,10 +46,26 @@ const HARDCODED_SMTP_PORT = 465;
 const HARDCODED_SMTP_USER = "ashfaq@rifetechsolutions.com";
 const HARDCODED_SMTP_PASS = "Ashfaq@rife123#";
 
+// ---------------------------------------------------------------------------
+// Hardcoded Supabase + Serper credentials.
+//
+// Single-tenant, private app whose deploy-host env vars aren't editable, so the
+// keys are baked in. Without the SERVICE ROLE key the server silently falls back
+// to an in-memory store (data resets on restart) — hardcoding it makes Render
+// actually persist to Supabase. Env vars always win over these.
+// ---------------------------------------------------------------------------
+const HARDCODED_SUPABASE_URL = "https://fktjdtncdtxlilvsjelf.supabase.co";
+const HARDCODED_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrdGpkdG5jZHR4bGlsdnNqZWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNzc5MTksImV4cCI6MjA5NjY1MzkxOX0.EZ9dDd7fx5exnBvokfhFWu4E9D3NL_BZPzfHqQ5eVRQ";
+const HARDCODED_SUPABASE_SERVICE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrdGpkdG5jZHR4bGlsdnNqZWxmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTA3NzkxOSwiZXhwIjoyMDk2NjUzOTE5fQ.x591goVY5WibftWuPaAf4KhiPw3zcpZ5Tr8HRAJfz50";
+const HARDCODED_SERPER_API_KEY = "e0f75ad2924a5a8535a928d3297bf29717f70adc";
+
 export function getEnv() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? HARDCODED_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? HARDCODED_SUPABASE_ANON_KEY;
+  const supabaseServiceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? HARDCODED_SUPABASE_SERVICE_KEY;
 
   const resendApiKey = process.env.RESEND_API_KEY ?? HARDCODED_RESEND_API_KEY;
   const resendFrom = process.env.RESEND_FROM ?? HARDCODED_RESEND_FROM;
@@ -96,8 +112,8 @@ export function getEnv() {
 
     // Supplier search — Serper.dev (real Google results via API).
     // Free 2,500 queries on signup. Needs a single API key.
-    serperApiKey: process.env.SERPER_API_KEY,
-    serperConfigured: Boolean(process.env.SERPER_API_KEY),
+    serperApiKey: process.env.SERPER_API_KEY ?? HARDCODED_SERPER_API_KEY,
+    serperConfigured: Boolean(process.env.SERPER_API_KEY ?? HARDCODED_SERPER_API_KEY),
     searchMaxResults: Number(process.env.SEARCH_MAX_RESULTS ?? 8),
   };
 }
