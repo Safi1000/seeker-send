@@ -22,8 +22,10 @@ import {
  *                     (lowest confidence; flagged in the UI).
  *   4. (none)       — nothing emailable found; the item is flagged.
  *
- * Result URLs come from the Serper API; Playwright opens each page to apply the
- * gate and harvest a contact email. Mock mode returns deterministic fakes.
+ * Result URLs come from the Serper API; each page is fetched over plain HTTP
+ * (no headless browser) to apply the gate and harvest a contact email. This
+ * keeps memory flat (~no Chromium), so large RFQs run on a 512MB host. Mock
+ * mode returns deterministic fakes.
  */
 
 export interface SearchOutcome {
@@ -50,93 +52,41 @@ export async function searchSuppliersForItem(item: RfqItem): Promise<SearchOutco
     return { candidates: [], result: "NOT_FOUND", usedMock: false };
   }
 
-  let ctx: import("playwright").BrowserContext | null = null;
   try {
-    const browser = await getSharedBrowser();
-    ctx = await browser.newContext({
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
-    });
-      // We only need each page's text + emails — block images/fonts/CSS/media.
-      // This is the single biggest memory + speed win on a small instance.
-      await ctx.route("**/*", (route) => {
-        const t = route.request().resourceType();
-        if (t === "image" || t === "media" || t === "font" || t === "stylesheet") {
-          return route.abort();
-        }
-        return route.continue();
+    // Stage 1 — exact part number. Include the manufacturer in the QUERY so
+    // results are biased toward the right industrial/technical listings (a
+    // bare part number like "900063" otherwise matches real-estate listing
+    // IDs etc.). The on-page gate still requires the exact part number.
+    if (pn) {
+      const query = [pn, item.manufacturer?.trim()].filter(Boolean).join(" ");
+      const urls = await serperUrls(query, env.serperApiKey, env.searchMaxResults);
+      const found = await inspectUrls(urls, { partNumber: pn, matchType: "PART_NUMBER" });
+      if (found.length) return done(found);
+    }
+
+    // Stage 2 — full description (part number still verified on page).
+    const descQuery = buildDescriptionQuery(item);
+    if (descQuery && descQuery !== pn) {
+      const urls = await serperUrls(descQuery, env.serperApiKey, env.searchMaxResults);
+      const found = await inspectUrls(urls, {
+        partNumber: pn || null,
+        matchType: "DESCRIPTION",
       });
-      const page = await ctx.newPage();
+      if (found.length) return done(found);
+    }
 
-      // Stage 1 — exact part number. Include the manufacturer in the QUERY so
-      // results are biased toward the right industrial/technical listings (a
-      // bare part number like "900063" otherwise matches real-estate listing
-      // IDs etc.). The on-page gate still requires the exact part number.
-      if (pn) {
-        const query = [pn, item.manufacturer?.trim()].filter(Boolean).join(" ");
-        const urls = await serperUrls(query, env.serperApiKey, env.searchMaxResults);
-        const found = await inspectUrls(page, urls, { partNumber: pn, matchType: "PART_NUMBER" });
-        if (found.length) return done(found);
-      }
-
-      // Stage 2 — full description (part number still verified on page).
-      const descQuery = buildDescriptionQuery(item);
-      if (descQuery && descQuery !== pn) {
-        const urls = await serperUrls(descQuery, env.serperApiKey, env.searchMaxResults);
-        const found = await inspectUrls(page, urls, {
-          partNumber: pn || null,
-          matchType: "DESCRIPTION",
-        });
-        if (found.length) return done(found);
-      }
-
-      // Stage 3 — manufacturer direct (no part-number gate).
-      if (item.manufacturer) {
-        const found = await findManufacturerContact(page, item.manufacturer, env);
-        if (found.length) return done(found);
-      }
+    // Stage 3 — manufacturer direct (no part-number gate).
+    if (item.manufacturer) {
+      const found = await findManufacturerContact(item.manufacturer, env);
+      if (found.length) return done(found);
+    }
 
     // Stage 4 — nothing emailable; flag the item.
     return { candidates: [], result: "NOT_FOUND", usedMock: false };
   } catch (err) {
     console.error("[search] supplier search failed:", err);
     return { candidates: [], result: "NOT_FOUND", usedMock: false };
-  } finally {
-    // Close only the per-item context; the browser is shared and reused.
-    if (ctx) await ctx.close().catch(() => {});
   }
-}
-
-// ---------------------------------------------------------------------------
-// Shared Chromium — launched once and reused across items.
-//
-// Re-launching Chromium per item caused big memory spikes that OOM-crash small
-// (512MB) hosts. A single long-lived browser (with a fresh, throwaway context
-// per item) plus low-memory flags keeps the footprint flat and stable.
-// ---------------------------------------------------------------------------
-let sharedBrowser: import("playwright").Browser | null = null;
-
-const LOW_MEM_ARGS = [
-  "--no-sandbox",
-  "--disable-setuid-sandbox",
-  "--disable-dev-shm-usage", // critical: containers have a tiny /dev/shm
-  "--disable-gpu",
-  "--disable-software-rasterizer",
-  "--disable-extensions",
-  "--disable-background-networking",
-  "--disable-default-apps",
-  "--no-zygote",
-  "--js-flags=--max-old-space-size=128",
-];
-
-async function getSharedBrowser(): Promise<import("playwright").Browser> {
-  if (sharedBrowser && sharedBrowser.isConnected()) return sharedBrowser;
-  const { chromium } = await import("playwright");
-  sharedBrowser = await chromium.launch({ headless: true, args: LOW_MEM_ARGS });
-  sharedBrowser.on("disconnected", () => {
-    sharedBrowser = null;
-  });
-  return sharedBrowser;
 }
 
 function done(candidates: SupplierCandidate[]): SearchOutcome {
@@ -182,7 +132,66 @@ async function serperUrls(query: string, apiKey: string, maxResults: number): Pr
 }
 
 // ---------------------------------------------------------------------------
-// Playwright — open candidates, gate, harvest email
+// Plain-HTTP page fetch — no headless browser.
+//
+// We only need each page's text + emails, so a raw GET (assets never
+// requested) is dramatically lighter than Chromium and runs on tiny hosts.
+// Trade-off vs. Playwright: pages whose content is injected purely by
+// client-side JS won't expose their text/emails. Most supplier product and
+// contact pages are server-rendered, so coverage stays high.
+// ---------------------------------------------------------------------------
+
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
+
+async function fetchHtml(url: string, timeoutMs: number): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": BROWSER_UA,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    if (!res.ok) return null;
+    const ctype = res.headers.get("content-type") ?? "";
+    // Skip binaries (PDFs, images) — we only parse HTML/text.
+    if (ctype && !/text\/html|application\/xhtml|text\/plain|application\/xml/i.test(ctype)) {
+      return null;
+    }
+    return await res.text();
+  } catch {
+    return null; // timeout, DNS failure, TLS error, etc. — just skip the page
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Strip HTML to visible-ish text so the exact part-number gate can run. */
+function htmlToText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/\s+/g, " ");
+}
+
+/** Pull the <title> text out of a page's HTML. */
+function htmlTitle(html: string): string | null {
+  const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (!m) return null;
+  return m[1].replace(/\s+/g, " ").trim() || null;
+}
+
+// ---------------------------------------------------------------------------
+// Open candidates, gate, harvest email
 // ---------------------------------------------------------------------------
 
 interface InspectOpts {
@@ -191,39 +200,29 @@ interface InspectOpts {
   matchType: MatchType;
 }
 
-async function inspectUrls(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  page: any,
-  urls: string[],
-  opts: InspectOpts,
-): Promise<SupplierCandidate[]> {
+async function inspectUrls(urls: string[], opts: InspectOpts): Promise<SupplierCandidate[]> {
   const out: SupplierCandidate[] = [];
   const seen = new Set<string>();
 
   for (const url of urls) {
     const domain = safeDomain(url);
     if (!domain || seen.has(domain)) continue;
-    try {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 25000 });
-      if (opts.partNumber) {
-        const bodyText = await page.evaluate(() => document.body?.innerText ?? "");
-        if (!pageContainsExactPartNumber(bodyText, opts.partNumber)) continue;
-      }
-      seen.add(domain);
-      const title = await page.title();
-      const html = await page.content();
-      const { email, emailSourceUrl } = await findEmail(page, url, html);
-      out.push({
-        supplierName: deriveSupplierName(url, title),
-        website: originOf(url),
-        productUrl: url,
-        email,
-        emailSourceUrl,
-        matchType: opts.matchType,
-      });
-    } catch (err) {
-      console.warn(`[search] failed to inspect ${url}:`, (err as Error).message);
+    const html = await fetchHtml(url, 20000);
+    if (!html) continue;
+    if (opts.partNumber) {
+      const text = htmlToText(html);
+      if (!pageContainsExactPartNumber(text, opts.partNumber)) continue;
     }
+    seen.add(domain);
+    const { email, emailSourceUrl } = await findEmail(url, html);
+    out.push({
+      supplierName: deriveSupplierName(url, htmlTitle(html)),
+      website: originOf(url),
+      productUrl: url,
+      email,
+      emailSourceUrl,
+      matchType: opts.matchType,
+    });
   }
   return out;
 }
@@ -234,8 +233,6 @@ async function inspectUrls(
  * result), without requiring the part number on the page.
  */
 async function findManufacturerContact(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  page: any,
   manufacturer: string,
   env: ReturnType<typeof getEnv>,
 ): Promise<SupplierCandidate[]> {
@@ -249,33 +246,26 @@ async function findManufacturerContact(
   }
 
   for (const url of ranked) {
-    try {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 25000 });
-      const title = await page.title();
-      const html = await page.content();
-      const { email, emailSourceUrl } = await findEmail(page, url, html);
-      if (!email) continue; // only useful if we can actually contact them
-      return [
-        {
-          supplierName: manufacturer,
-          website: originOf(url),
-          productUrl: url,
-          email,
-          emailSourceUrl,
-          matchType: "MANUFACTURER",
-        },
-      ];
-    } catch {
-      // try the next candidate
-    }
+    const html = await fetchHtml(url, 20000);
+    if (!html) continue;
+    const { email, emailSourceUrl } = await findEmail(url, html);
+    if (!email) continue; // only useful if we can actually contact them
+    return [
+      {
+        supplierName: manufacturer,
+        website: originOf(url),
+        productUrl: url,
+        email,
+        emailSourceUrl,
+        matchType: "MANUFACTURER",
+      },
+    ];
   }
   return [];
 }
 
 /** Look for an email on the page, then common contact/about pages. */
 async function findEmail(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  page: any,
   productUrl: string,
   productHtml: string,
 ): Promise<{ email: string | null; emailSourceUrl: string | null }> {
@@ -286,14 +276,10 @@ async function findEmail(
   const paths = ["/contact", "/contact-us", "/about"];
   for (const path of paths) {
     const target = origin + path;
-    try {
-      await page.goto(target, { waitUntil: "domcontentloaded", timeout: 15000 });
-      const html = await page.content();
-      const email = pickBestEmail(extractEmails(html));
-      if (email) return { email, emailSourceUrl: target };
-    } catch {
-      // page may not exist — keep trying
-    }
+    const html = await fetchHtml(target, 15000);
+    if (!html) continue;
+    const email = pickBestEmail(extractEmails(html));
+    if (email) return { email, emailSourceUrl: target };
   }
   return { email: null, emailSourceUrl: null };
 }

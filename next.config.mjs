@@ -6,8 +6,6 @@ const nextConfig = {
     "pdf-parse",
     "pdfjs-dist",
     "tesseract.js",
-    "playwright",
-    "playwright-core",
     "@napi-rs/canvas",
   ],
   eslint: {

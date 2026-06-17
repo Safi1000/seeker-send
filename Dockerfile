@@ -1,12 +1,15 @@
 # Deploy-only image for Render / Railway (built in their cloud — you never run
-# Docker locally). Based on the official Playwright image, which ships Chromium
-# and all the system libraries it (and OCR/canvas) need.
-FROM mcr.microsoft.com/playwright:v1.50.1-jammy
+# Docker locally). No headless browser any more: supplier search runs over plain
+# HTTP fetch, so a slim Node image is enough. This drops Chromium's 200-400MB
+# runtime footprint, which is what OOM-crashed the 512MB free tier.
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
-# Browsers already live in the image — skip the redundant postinstall download.
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+# @napi-rs/canvas (PDF-render OCR fallback) needs fontconfig at runtime.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libfontconfig1 \
+  && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies (dev deps included — needed for the Next.js build).
 COPY package*.json ./
