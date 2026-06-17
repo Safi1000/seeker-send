@@ -8,6 +8,7 @@ import { generateGroupEmail } from "@/lib/email/template";
 import { Card } from "@/components/ui/card";
 import { GroupedResults, type GroupView, type NoContactView } from "@/components/grouped-results";
 import { DeleteRfqButton } from "@/components/delete-rfq-button";
+import { ScanRunner } from "@/components/scan-runner";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,10 @@ export default async function RfqDetailPage({
   }));
 
   const itemCount = itemsWithSuppliers.length;
+  const pendingItemIds = itemsWithSuppliers
+    .filter(({ item }) => item.status === "PENDING_SEARCH")
+    .map(({ item }) => item.id);
+  const scannedCount = itemCount - pendingItemIds.length;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -81,7 +86,8 @@ export default async function RfqDetailPage({
             <h1 className="text-2xl font-semibold tracking-tight">{rfq.reference_number}</h1>
             <p className="text-sm text-muted-foreground">
               Uploaded {new Date(rfq.uploaded_at).toLocaleString()} · {itemCount} items ·{" "}
-              {groupViews.length} supplier {groupViews.length === 1 ? "group" : "groups"}
+              {scannedCount}/{itemCount} scanned · {groupViews.length} supplier{" "}
+              {groupViews.length === 1 ? "group" : "groups"}
             </p>
           </div>
         </div>
@@ -98,12 +104,15 @@ export default async function RfqDetailPage({
           No items extracted for this RFQ.
         </Card>
       ) : (
-        <GroupedResults
-          groups={groupViews}
-          noContact={noContactViews}
-          mock={outlook.mock}
-          configured={outlook.configured}
-        />
+        <>
+          <ScanRunner pendingItemIds={pendingItemIds} />
+          <GroupedResults
+            groups={groupViews}
+            noContact={noContactViews}
+            mock={outlook.mock}
+            configured={outlook.configured}
+          />
+        </>
       )}
     </div>
   );

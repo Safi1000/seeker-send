@@ -2,23 +2,20 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UploadCloud, Loader2, Search } from "lucide-react";
+import { UploadCloud, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-type Phase = "idle" | "extracting" | "scanning";
+type Phase = "idle" | "extracting";
 
 export default function UploadPage() {
   const router = useRouter();
   const [dragOver, setDragOver] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [reference, setReference] = useState("");
-  const [scanTotal, setScanTotal] = useState(0);
-  const [scanDone, setScanDone] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(
@@ -29,7 +26,9 @@ export default function UploadPage() {
       }
       setPhase("extracting");
       try {
-        // 1. Upload + extract items.
+        // Upload + extract items, then go straight to the RFQ page — supplier
+        // scanning runs there (driven off the DB, so it's resumable and
+        // survives navigating away).
         const fd = new FormData();
         fd.append("file", file);
         if (reference.trim()) fd.append("reference_number", reference.trim());
@@ -40,25 +39,8 @@ export default function UploadPage() {
           setPhase("idle");
           return;
         }
-        const rfqId: string = data.rfq.id;
-        const items: { id: string }[] = data.items;
-        toast.success(`Extracted ${items.length} item(s) from ${data.rfq.reference_number}.`);
-
-        // 2. Auto-scan suppliers for every item (sequentially, with progress).
-        setPhase("scanning");
-        setScanTotal(items.length);
-        setScanDone(0);
-        for (const it of items) {
-          try {
-            await fetch(`/api/items/${it.id}/search`, { method: "POST" });
-          } catch {
-            // keep going — one failed item shouldn't abort the batch
-          }
-          setScanDone((n) => n + 1);
-        }
-
-        toast.success("Supplier scan complete.");
-        router.push(`/rfqs/${rfqId}`);
+        toast.success(`Extracted ${data.items.length} item(s) — finding suppliers…`);
+        router.push(`/rfqs/${data.rfq.id}`);
       } catch (err) {
         toast.error((err as Error).message);
         setPhase("idle");
@@ -78,7 +60,6 @@ export default function UploadPage() {
   );
 
   const busy = phase !== "idle";
-  const pct = scanTotal > 0 ? Math.round((scanDone / scanTotal) * 100) : 0;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -143,20 +124,6 @@ export default function UploadPage() {
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
             <div className="text-sm font-medium">Extracting items…</div>
           </>
-        )}
-
-        {phase === "scanning" && (
-          <div className="w-full max-w-sm space-y-3">
-            <Search className="mx-auto h-10 w-10 animate-pulse text-primary" />
-            <div className="text-sm font-medium">
-              Finding suppliers… item {Math.min(scanDone + 1, scanTotal)} of {scanTotal}
-            </div>
-            <Progress value={pct} />
-            <div className="text-xs text-muted-foreground">
-              Searching the web and verifying exact part-number matches. This can take a moment per
-              item.
-            </div>
-          </div>
         )}
       </Card>
     </div>

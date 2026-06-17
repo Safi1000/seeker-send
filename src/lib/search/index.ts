@@ -60,9 +60,13 @@ export async function searchSuppliersForItem(item: RfqItem): Promise<SearchOutco
       });
       const page = await ctx.newPage();
 
-      // Stage 1 — exact part number.
+      // Stage 1 — exact part number. Include the manufacturer in the QUERY so
+      // results are biased toward the right industrial/technical listings (a
+      // bare part number like "900063" otherwise matches real-estate listing
+      // IDs etc.). The on-page gate still requires the exact part number.
       if (pn) {
-        const urls = await serperUrls(pn, env.serperApiKey, env.searchMaxResults);
+        const query = [pn, item.manufacturer?.trim()].filter(Boolean).join(" ");
+        const urls = await serperUrls(query, env.serperApiKey, env.searchMaxResults);
         const found = await inspectUrls(page, urls, { partNumber: pn, matchType: "PART_NUMBER" });
         if (found.length) return done(found);
       }
@@ -96,7 +100,19 @@ export async function searchSuppliersForItem(item: RfqItem): Promise<SearchOutco
 }
 
 function done(candidates: SupplierCandidate[]): SearchOutcome {
-  return { candidates, result: candidates.length ? "FOUND" : "NOT_FOUND", usedMock: false };
+  // Collapse duplicate emails so the same supplier is never stored — and so a
+  // bulk send can't email the same address twice for one item.
+  const seen = new Set<string>();
+  const deduped: SupplierCandidate[] = [];
+  for (const c of candidates) {
+    const key = c.email?.toLowerCase();
+    if (key) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    deduped.push(c);
+  }
+  return { candidates: deduped, result: deduped.length ? "FOUND" : "NOT_FOUND", usedMock: false };
 }
 
 /** Build a description query from the most identifying item fields. */
@@ -260,7 +276,14 @@ function dedupeByDomain(urls: string[]): string[] {
   for (const u of urls) {
     const d = safeDomain(u);
     if (!d || seen.has(d)) continue;
-    if (/duckduckgo|google|bing|facebook|youtube|linkedin|twitter|x\.com|reddit/.test(d)) continue;
+    // Skip search engines, social, marketplaces, and irrelevant verticals
+    // (real estate, jobs, Q&A) that pollute bare-number searches.
+    if (
+      /duckduckgo|google|bing|yahoo|facebook|youtube|linkedin|twitter|x\.com|reddit|pinterest|instagram|tiktok|wikipedia|quora|zillow|realtor|trulia|redfin|realestate|apartments?|rent\.com|homes?\.com|housing|indeed|glassdoor|craigslist/.test(
+        d,
+      )
+    )
+      continue;
     seen.add(d);
     out.push(u);
   }
