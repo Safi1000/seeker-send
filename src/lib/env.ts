@@ -121,7 +121,7 @@ export function getEnv() {
     // Free 2,500 queries on signup. Needs a single API key.
     serperApiKey: process.env.SERPER_API_KEY ?? HARDCODED_SERPER_API_KEY,
     serperConfigured: Boolean(process.env.SERPER_API_KEY ?? HARDCODED_SERPER_API_KEY),
-    searchMaxResults: Number(process.env.SEARCH_MAX_RESULTS ?? 8),
+    searchMaxResults: Number(process.env.SEARCH_MAX_RESULTS ?? 5),
   };
 }
 

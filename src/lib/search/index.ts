@@ -50,13 +50,21 @@ export async function searchSuppliersForItem(item: RfqItem): Promise<SearchOutco
     return { candidates: [], result: "NOT_FOUND", usedMock: false };
   }
 
+  let ctx: import("playwright").BrowserContext | null = null;
   try {
-    const { chromium } = await import("playwright");
-    const browser = await chromium.launch({ headless: true });
-    try {
-      const ctx = await browser.newContext({
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+    const browser = await getSharedBrowser();
+    ctx = await browser.newContext({
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+    });
+      // We only need each page's text + emails — block images/fonts/CSS/media.
+      // This is the single biggest memory + speed win on a small instance.
+      await ctx.route("**/*", (route) => {
+        const t = route.request().resourceType();
+        if (t === "image" || t === "media" || t === "font" || t === "stylesheet") {
+          return route.abort();
+        }
+        return route.continue();
       });
       const page = await ctx.newPage();
 
@@ -88,15 +96,47 @@ export async function searchSuppliersForItem(item: RfqItem): Promise<SearchOutco
         if (found.length) return done(found);
       }
 
-      // Stage 4 — nothing emailable; flag the item.
-      return { candidates: [], result: "NOT_FOUND", usedMock: false };
-    } finally {
-      await browser.close();
-    }
+    // Stage 4 — nothing emailable; flag the item.
+    return { candidates: [], result: "NOT_FOUND", usedMock: false };
   } catch (err) {
     console.error("[search] supplier search failed:", err);
     return { candidates: [], result: "NOT_FOUND", usedMock: false };
+  } finally {
+    // Close only the per-item context; the browser is shared and reused.
+    if (ctx) await ctx.close().catch(() => {});
   }
+}
+
+// ---------------------------------------------------------------------------
+// Shared Chromium — launched once and reused across items.
+//
+// Re-launching Chromium per item caused big memory spikes that OOM-crash small
+// (512MB) hosts. A single long-lived browser (with a fresh, throwaway context
+// per item) plus low-memory flags keeps the footprint flat and stable.
+// ---------------------------------------------------------------------------
+let sharedBrowser: import("playwright").Browser | null = null;
+
+const LOW_MEM_ARGS = [
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-dev-shm-usage", // critical: containers have a tiny /dev/shm
+  "--disable-gpu",
+  "--disable-software-rasterizer",
+  "--disable-extensions",
+  "--disable-background-networking",
+  "--disable-default-apps",
+  "--no-zygote",
+  "--js-flags=--max-old-space-size=128",
+];
+
+async function getSharedBrowser(): Promise<import("playwright").Browser> {
+  if (sharedBrowser && sharedBrowser.isConnected()) return sharedBrowser;
+  const { chromium } = await import("playwright");
+  sharedBrowser = await chromium.launch({ headless: true, args: LOW_MEM_ARGS });
+  sharedBrowser.on("disconnected", () => {
+    sharedBrowser = null;
+  });
+  return sharedBrowser;
 }
 
 function done(candidates: SupplierCandidate[]): SearchOutcome {
@@ -243,7 +283,7 @@ async function findEmail(
   if (onPage) return { email: onPage, emailSourceUrl: productUrl };
 
   const origin = originOf(productUrl);
-  const paths = ["/contact", "/contact-us", "/about", "/about-us", "/support"];
+  const paths = ["/contact", "/contact-us", "/about"];
   for (const path of paths) {
     const target = origin + path;
     try {
