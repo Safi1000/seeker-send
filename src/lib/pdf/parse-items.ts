@@ -152,6 +152,7 @@ export function parseRfqItems(text: string): ExtractedItem[] {
       manufacturer: null,
       partNumber: null,
       product: null,
+      description: null,
       boxSize: null,
       application: null,
       analyzerModel: null,
@@ -168,13 +169,17 @@ export function parseRfqItems(text: string): ExtractedItem[] {
 
     const consumed = new Set<number>();
     let standaloneProduct: string | null = null;
+    // Every spec line of the item, kept verbatim, so the full description can be
+    // emailed exactly as written (the structured fields above are only a subset).
+    const descLines: string[] = [];
 
     for (let i = 0; i < block.length; i++) {
       if (consumed.has(i)) continue;
       const line = block[i];
       if (line.trim() === "") continue;
 
-      // 1. Quantity / unit (bare "1  each").
+      // 1. Quantity / unit (bare "1  each"). Captured as a field, not description
+      //    (it's rendered separately as "Qty").
       if (item.quantity == null) {
         const qu = matchQtyUnit(line);
         if (qu) {
@@ -184,7 +189,9 @@ export function parseRfqItems(text: string): ExtractedItem[] {
         }
       }
 
-      // 2. Label on its own line -> value on the next non-empty line.
+      // 2. Label on its own line -> value on the next non-empty line (e.g.
+      //    "Manufacturer part number" / "900063"). Both lines are pulled out of
+      //    the description since the part number is rendered separately.
       const lonely = labelOnly(line);
       if (lonely) {
         const next = block.findIndex((l, j) => j > i && l.trim() !== "");
@@ -196,10 +203,12 @@ export function parseRfqItems(text: string): ExtractedItem[] {
         continue;
       }
 
-      // 3. "LABEL: value" on one line.
+      // 3. "LABEL: value" on one line. Captured as a field AND kept verbatim in
+      //    the description (it's real spec content the supplier needs).
       const inline = bestInlineMatch(line);
       if (inline) {
         applyField(item, inline.key, inline.value);
+        descLines.push(line.trim());
         continue;
       }
 
@@ -207,10 +216,12 @@ export function parseRfqItems(text: string): ExtractedItem[] {
       if (!standaloneProduct && line.trim().length >= 2) {
         standaloneProduct = cleanValue(line);
       }
+      descLines.push(line.trim());
     }
 
     // Product preference: explicit label > standalone line (e.g. "PUMP") > header short text.
     if (!item.product) item.product = standaloneProduct ?? (start.headerText || null);
+    item.description = descLines.join("\n").trim() || null;
 
     return item;
   });

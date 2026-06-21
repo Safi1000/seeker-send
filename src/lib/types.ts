@@ -39,6 +39,8 @@ export interface RfqItem {
   part_number: string | null;
   manufacturer: string | null;
   product: string | null;
+  /** The full verbatim description block from the RFQ (every spec line). */
+  description: string | null;
   box_size: string | null;
   application: string | null;
   analyzer_model: string | null;
@@ -86,6 +88,8 @@ export interface ExtractedItem {
   manufacturer: string | null;
   partNumber: string | null;
   product: string | null;
+  /** The full verbatim description block from the RFQ (every spec line). */
+  description: string | null;
   boxSize: string | null;
   application: string | null;
   analyzerModel: string | null;

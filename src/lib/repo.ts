@@ -44,6 +44,8 @@ function seed(): MemStore {
       part_number: "2010B-2111-MS",
       manufacturer: "Servomex",
       product: "Oxygen Analyzer Sensor Cell",
+      description:
+        "Oxygen Analyzer Sensor Cell\nAPPLICATION: Combustion control\nANALYZER MODEL: SERVOTOUGH OxyExact 2200\nTAG NO: AT-4501",
       box_size: "1",
       application: "Combustion control",
       analyzer_model: "SERVOTOUGH OxyExact 2200",
@@ -59,6 +61,8 @@ function seed(): MemStore {
       part_number: "M400-FF-N1",
       manufacturer: "Mettler Toledo",
       product: "pH Transmitter",
+      description:
+        "pH Transmitter\nAPPLICATION: Effluent monitoring\nANALYZER MODEL: M400\nTAG NO: AIT-2210",
       box_size: "1",
       application: "Effluent monitoring",
       analyzer_model: "M400",
@@ -74,6 +78,7 @@ function seed(): MemStore {
       part_number: "X-9921-CUSTOM",
       manufacturer: null,
       product: "Custom analyzer manifold",
+      description: "Custom analyzer manifold",
       box_size: null,
       application: null,
       analyzer_model: null,
@@ -217,6 +222,7 @@ export async function insertItems(
     part_number: e.partNumber,
     manufacturer: e.manufacturer,
     product: e.product,
+    description: e.description,
     box_size: e.boxSize,
     application: e.application,
     analyzer_model: e.analyzerModel,

@@ -27,6 +27,7 @@ create table if not exists public.rfq_items (
   part_number    text,
   manufacturer   text,
   product        text,
+  description    text,                        -- full verbatim description block from the RFQ
   box_size       text,
   application    text,
   analyzer_model text,

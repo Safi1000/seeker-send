@@ -19,7 +19,14 @@ function hasValue(v: unknown): v is string | number {
   return v !== null && v !== undefined && String(v).trim() !== "";
 }
 
-/** The per-item detail block (everything between the header and the closing). */
+/**
+ * The per-item detail block (everything between the header and the closing).
+ *
+ * The body is the item's FULL description from the RFQ, verbatim — every spec
+ * line (TYPE, MATERIAL, MODEL, DRAWING NO, SERIAL NO, FFT1..n, ADDRESS, …), not
+ * just a handful of recognised fields. The part number and quantity are pulled
+ * out as labelled lines for clarity; everything else is sent exactly as written.
+ */
 function itemBlock(item: RfqItem): string[] {
   const lines: string[] = [];
   lines.push(`Item ${item.item_number}`);
@@ -30,26 +37,12 @@ function itemBlock(item: RfqItem): string[] {
     lines.push("");
   }
 
-  if (hasValue(item.product)) {
-    lines.push(String(item.product));
-    lines.push("");
-  }
-
-  if (hasValue(item.box_size)) lines.push(`BOX SIZE: ${item.box_size}`);
-  if (hasValue(item.application)) lines.push(`APPLICATION: ${item.application}`);
-  if (hasValue(item.analyzer_model)) lines.push(`ANALYZER MODEL: ${item.analyzer_model}`);
-  if (hasValue(item.tag_number)) lines.push(`TAG NO: ${item.tag_number}`);
-  if (
-    hasValue(item.box_size) ||
-    hasValue(item.application) ||
-    hasValue(item.analyzer_model) ||
-    hasValue(item.tag_number)
-  ) {
-    lines.push("");
-  }
-
-  if (hasValue(item.manufacturer)) {
-    lines.push(`MNFR: ${item.manufacturer}`);
+  // The entire description, exactly as it appears in the RFQ. Fall back to the
+  // short product text if no description block was captured.
+  const description = hasValue(item.description) ? String(item.description) : "";
+  const body = description || (hasValue(item.product) ? String(item.product) : "");
+  if (body) {
+    lines.push(body);
     lines.push("");
   }
 
