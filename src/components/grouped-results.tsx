@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Globe,
@@ -261,6 +261,18 @@ function GroupCard({
   const [open, setOpen] = useState(false);
   const [subject, setSubject] = useState(group.subject);
   const [body, setBody] = useState(group.body);
+
+  // Re-sync the editable draft when the generated email changes — e.g. when more
+  // items get grouped into this recipient after the card first mounted. Without
+  // this, useState keeps the body captured at mount and the dialog silently
+  // omits the newly-added items. Only sync while closed, so an in-progress edit
+  // is never overwritten.
+  useEffect(() => {
+    if (!open) {
+      setSubject(group.subject);
+      setBody(group.body);
+    }
+  }, [group.subject, group.body, open]);
 
   async function send() {
     const ok = await onSend(group, subject, body);
