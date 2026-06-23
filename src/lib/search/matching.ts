@@ -44,6 +44,9 @@ const EMAIL_BLOCKLIST = [
   "academia.edu",
   "coursehero.com",
   "studocu.com",
+  // Marketing / CRM / tracking platforms that expose hashed relay addresses.
+  "xiaoman.cn",
+  "sentry-next.wixpress.com",
 ];
 
 // Common multi-letter gTLDs. Any 2-letter (country) TLD is also accepted, so
@@ -60,10 +63,26 @@ const VALID_GTLDS = new Set([
 
 const ASSET_EXT = /\.(png|jpg|jpeg|gif|svg|webp|css|js|json|woff2?|ttf)$/i;
 
-/** Reject obvious junk: bad TLD, or a random-looking domain (long consonant run). */
+/**
+ * Reject local-parts that are clearly machine tokens, not human mailboxes:
+ * hex hashes (md5/sha relay addresses), mostly-digit ids, or long vowel-less
+ * strings. Catches things like ca254c5714ff4a723a1db3821caa9673@… .
+ */
+function looksLikeToken(local: string): boolean {
+  if (/^[0-9a-f]{16,}$/i.test(local)) return true; // hex hash relay address
+  const digits = (local.match(/\d/g) ?? []).length;
+  if (local.length >= 16 && digits >= local.length / 2) return true; // long & mostly digits
+  if (local.length >= 20 && !/[aeiou]/i.test(local)) return true; // long, no vowels
+  return false;
+}
+
+/** Reject obvious junk: token local-part, bad TLD, or a random-looking domain. */
 function isPlausibleEmail(email: string): boolean {
   const at = email.indexOf("@");
   if (at < 1) return false;
+  const local = email.slice(0, at);
+  if (looksLikeToken(local)) return false;
+
   const domain = email.slice(at + 1);
   const labels = domain.split(".");
   const tld = labels[labels.length - 1];
@@ -80,7 +99,11 @@ function isPlausibleEmail(email: string): boolean {
 export function extractEmails(text: string): string[] {
   const found = text.match(EMAIL_RE) ?? [];
   const cleaned = found
-    .map((e) => e.toLowerCase().replace(/\.$/, ""))
+    .map((e) => e.toLowerCase())
+    // Strip leading URL-encoding (%20 etc.) and stray punctuation that bleeds in
+    // from mailto: links / surrounding markup: "%20tomco@x.com" -> "tomco@x.com".
+    .map((e) => e.replace(/^(?:%[0-9a-f]{2})+/i, "").replace(/^[._%+-]+/, ""))
+    .map((e) => e.replace(/\.$/, ""))
     .filter((e) => !EMAIL_BLOCKLIST.some((b) => e.includes(b)))
     .filter((e) => !ASSET_EXT.test(e))
     .filter(isPlausibleEmail);
