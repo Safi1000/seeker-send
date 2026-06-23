@@ -46,6 +46,49 @@ function norm(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+/** The domain part of an email, lowercased (e.g. "sales@x.com" -> "x.com"). */
+function emailDomain(email: string): string {
+  const at = email.lastIndexOf("@");
+  return (at >= 0 ? email.slice(at + 1) : email).toLowerCase();
+}
+
+// Shared free-mail providers. Two *different* suppliers may both use one of
+// these, so items landing on the same free domain must NOT be merged — they're
+// grouped by full address instead.
+const FREE_EMAIL_DOMAINS = new Set([
+  "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.uk", "yahoo.co.in",
+  "hotmail.com", "hotmail.co.uk", "outlook.com", "live.com", "msn.com",
+  "aol.com", "icloud.com", "me.com", "protonmail.com", "proton.me", "gmx.com",
+  "gmx.net", "mail.com", "yandex.com", "yandex.ru", "zoho.com", "qq.com",
+  "163.com", "126.com", "sina.com", "rediffmail.com",
+]);
+
+/**
+ * Grouping key for a recipient. For a company domain it's just the domain, so
+ * every mailbox at that domain (sales@, info@, contact@…) collapses into ONE
+ * email. For a shared free-mail domain it's the full address, so unrelated
+ * suppliers on the same provider stay separate.
+ */
+function groupKey(email: string): string {
+  const domain = emailDomain(email);
+  return FREE_EMAIL_DOMAINS.has(domain) ? email.toLowerCase() : domain;
+}
+
+// Preferred mailbox roles when one company domain exposed several addresses.
+const RECIPIENT_PRIORITY = [
+  "sales", "purchasing", "quote", "rfq", "info", "contact", "enquir", "support",
+];
+
+/** Choose the single best address to actually send to for a group. */
+function bestRecipient(emails: string[]): string {
+  const unique = [...new Set(emails.map((e) => e.toLowerCase()))];
+  for (const role of RECIPIENT_PRIORITY) {
+    const hit = unique.find((e) => e.split("@")[0].includes(role));
+    if (hit) return hit;
+  }
+  return unique[0];
+}
+
 /** Does this supplier look like it belongs to the item's stated manufacturer? */
 function matchesManufacturer(item: RfqItem, supplier: Supplier): boolean {
   if (!item.manufacturer) return false;
@@ -66,7 +109,10 @@ export function choosePrimarySupplier(item: RfqItem, suppliers: Supplier[]): Sup
 }
 
 export function groupItemsBySupplier(input: ItemWithSuppliers[]): GroupingResult {
-  const byEmail = new Map<string, SupplierGroup>();
+  // Keyed by recipient domain (or full address for free-mail providers), so
+  // every item bound for the same company collapses into a single email even
+  // when different pages exposed different mailboxes at that domain.
+  const byKey = new Map<string, SupplierGroup & { _emails: string[] }>();
   const noContact: RfqItem[] = [];
 
   for (const { item, suppliers } of input) {
@@ -75,31 +121,36 @@ export function groupItemsBySupplier(input: ItemWithSuppliers[]): GroupingResult
       noContact.push(item);
       continue;
     }
-    const key = primary.email.toLowerCase();
+    const key = groupKey(primary.email);
     const primaryMatch = primary.match_type ?? "PART_NUMBER";
-    let group = byEmail.get(key);
+    let group = byKey.get(key);
     if (!group) {
       group = {
-        email: key,
+        email: primary.email.toLowerCase(), // provisional; finalised below
         supplierName: primary.supplier_name ?? item.manufacturer ?? key,
         website: primary.website,
         supplierId: primary.id,
         matchType: primaryMatch,
         entries: [],
+        _emails: [],
       };
-      byEmail.set(key, group);
+      byKey.set(key, group);
     } else {
       group.matchType = bestMatch(group.matchType, primaryMatch);
     }
+    group._emails.push(primary.email.toLowerCase());
     group.entries.push({ item, supplier: primary });
   }
 
-  // Order groups by their lowest item number for a stable, readable layout.
-  const groups = [...byEmail.values()].sort(
-    (a, b) =>
-      Math.min(...a.entries.map((e) => e.item.item_number)) -
-      Math.min(...b.entries.map((e) => e.item.item_number)),
-  );
+  // Finalise each group's single recipient address, then drop the scratch field.
+  const groups: SupplierGroup[] = [...byKey.values()]
+    .map(({ _emails, ...g }) => ({ ...g, email: bestRecipient(_emails) }))
+    // Order groups by their lowest item number for a stable, readable layout.
+    .sort(
+      (a, b) =>
+        Math.min(...a.entries.map((e) => e.item.item_number)) -
+        Math.min(...b.entries.map((e) => e.item.item_number)),
+    );
   noContact.sort((a, b) => a.item_number - b.item_number);
 
   return { groups, noContact };
