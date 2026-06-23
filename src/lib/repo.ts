@@ -234,7 +234,13 @@ export async function insertItems(
 
   const db = createSupabaseAdminClient();
   if (db) {
-    const { data, error } = await db.from("rfq_items").insert(rows).select("*");
+    let { data, error } = await db.from("rfq_items").insert(rows).select("*");
+    // Self-heal if the `description` column hasn't been migrated yet: drop it
+    // and retry, so uploads never break before the one-line ALTER is run.
+    if (error && /description/i.test(error.message ?? "")) {
+      const rowsNoDesc = rows.map(({ description, ...rest }) => rest);
+      ({ data, error } = await db.from("rfq_items").insert(rowsNoDesc).select("*"));
+    }
     if (error) throw error;
     return data as RfqItem[];
   }

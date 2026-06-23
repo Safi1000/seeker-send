@@ -37,6 +37,13 @@ const EMAIL_BLOCKLIST = [
   "email.com",
   "yourcompany.com",
   "@2x",
+  // Document-host / aggregator domains — never a real supplier contact.
+  "scribd.com",
+  "slideshare.net",
+  "issuu.com",
+  "academia.edu",
+  "coursehero.com",
+  "studocu.com",
 ];
 
 // Common multi-letter gTLDs. Any 2-letter (country) TLD is also accepted, so

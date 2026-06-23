@@ -305,7 +305,7 @@ function dedupeByDomain(urls: string[]): string[] {
     // Skip search engines, social, marketplaces, and irrelevant verticals
     // (real estate, jobs, Q&A) that pollute bare-number searches.
     if (
-      /duckduckgo|google|bing|yahoo|facebook|youtube|linkedin|twitter|x\.com|reddit|pinterest|instagram|tiktok|wikipedia|quora|zillow|realtor|trulia|redfin|realestate|apartments?|rent\.com|homes?\.com|housing|indeed|glassdoor|craigslist/.test(
+      /duckduckgo|google|bing|yahoo|facebook|youtube|linkedin|twitter|x\.com|reddit|pinterest|instagram|tiktok|wikipedia|quora|zillow|realtor|trulia|redfin|realestate|apartments?|rent\.com|homes?\.com|housing|indeed|glassdoor|craigslist|scribd|slideshare|issuu|academia\.edu|coursehero|studocu/.test(
         d,
       )
     )
